@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using TDSTecnologia.Site.Core.Entities;
@@ -13,7 +15,17 @@ namespace TDSTecnologia.Site.Web.Controllers
     {
         public async Task<IActionResult> Index()
         {
-            return View(await _context.CursoDao.ToListAsync());
+            List<Curso> cursos = await _context.CursoDao.ToListAsync();
+
+            cursos.ForEach(c =>
+            {
+                if (c.Banner != null)
+                {
+                    c.BannerBase64 = "data:image/png;base64," + Convert.ToBase64String(c.Banner, 0, c.Banner.Length);
+                }
+            });
+
+            return View(cursos);
         }
 
         private readonly AppContexto _context;
@@ -31,8 +43,15 @@ namespace TDSTecnologia.Site.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Novo([Bind("Id,Nome,Descricao,QuantidadeAula,DataInicio")] Curso curso)
+        public async Task<IActionResult> Novo([Bind("Id,Nome,Descricao,QuantidadeAula,DataInicio,Turno")] Curso curso, IFormFile arquivo)
         {
+            if (arquivo != null && arquivo.ContentType.ToLower().StartsWith("image/"))
+            {
+                MemoryStream ms = new MemoryStream();
+                await arquivo.OpenReadStream().CopyToAsync(ms);
+                curso.Banner = ms.ToArray();
+            }
+
             if (ModelState.IsValid)
             {
                 _context.Add(curso);
